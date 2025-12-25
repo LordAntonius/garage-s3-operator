@@ -1,131 +1,135 @@
-# Garage S3 Operator
+# garage-s3-operator
+// TODO(user): Add simple overview of use/purpose
 
-Garage is a Kubernetes operator that makes it easy to provision and manage Garage S3 storage resources for applications running on your cluster. The project (Garage) aims to provide a simple CR-driven model to create S3 buckets, manage access credentials, lifecycle policies, and integrate with on-prem or cloud S3-compatible backends.
+## Description
+// TODO(user): An in-depth paragraph about your project and overview of use
 
-More info: https://garagehq.deuxfleurs.fr
+## Getting Started
 
-## Key Features
+### Prerequisites
+- go version v1.24.0+
+- docker version 17.03+.
+- kubectl version v1.11.3+.
+- Access to a Kubernetes v1.11.3+ cluster.
 
-- **CR-driven provisioning**: Define storage resources using Kubernetes Custom Resources.
-- **Credential management**: Automatic creation and rotation of S3 credentials (secrets) scoped to resources.
-- **Bucket lifecycle**: Express common lifecycle rules (retention, expiration) via CR fields.
-- **Kubernetes-native**: Integrates with RBAC, Secrets, and standard k8s tooling.
+### To Deploy on the cluster
+**Build and push your image to the location specified by `IMG`:**
 
-## Intent & Scope
-
-This operator is intended to be a cluster-native operator that: provision S3 buckets on S3-compatible endpoints, manage credentials as Kubernetes Secrets, and expose an easy-to-use API for developers and platform operators. This repository hosts the operator source and related manifests.
-
-This project is currently in active development — consider this README a living document.
-
-## Prerequisites
-
-- A Kubernetes cluster (v1.20+ recommended).
-- `kubectl` configured to access the cluster.
-- An S3-compatible endpoint and credentials (unless you're running a local backend like MinIO).
-- (Optional) `helm` or `operator-sdk` if you plan to build and deploy from source.
-
-## Quickstart (example)
-
-1. Install the CRDs and operator manifests (example):
-
-```bash
-# Apply CRDs and controller manifest (replace with packaged YAML or helm chart when available)
-kubectl apply -f config/crd/bases/
-kubectl apply -f config/manager/manager.yaml
+```sh
+make docker-build docker-push IMG=<some-registry>/garage-s3-operator:tag
 ```
 
-2. Create a sample S3 resource (example custom resource):
+**NOTE:** This image ought to be published in the personal registry you specified.
+And it is required to have access to pull the image from the working environment.
+Make sure you have the proper permission to the registry if the above commands don’t work.
 
-```yaml
-apiVersion: garage.deuxfleurs.fr/v1alpha1
-kind: S3Bucket
-metadata:
-	name: demo-bucket
-spec:
-	backend:
-		endpoint: "https://minio.example.local"
-		region: "us-east-1"
-	bucketName: demo-bucket
-	versioning: true
-	lifecycle:
-		- id: expire-logs
-			prefix: logs/
-			expirationDays: 30
-	credentials:
-		createSecret: true
-		secretName: demo-bucket-credentials
+**Install the CRDs into the cluster:**
+
+```sh
+make install
 ```
 
-Apply the resource:
+**Deploy the Manager to the cluster with the image specified by `IMG`:**
 
-```bash
-kubectl apply -f examples/s3bucket-sample.yaml
+```sh
+make deploy IMG=<some-registry>/garage-s3-operator:tag
 ```
 
-3. Inspect created objects:
+> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
+privileges or be logged in as admin.
 
-```bash
-kubectl get s3buckets
-kubectl get secrets demo-bucket-credentials -o yaml
+**Create instances of your solution**
+You can apply the samples (examples) from the config/sample:
+
+```sh
+kubectl apply -k config/samples/
 ```
 
-Note: The CRD `S3Bucket` and field names above are an example schema to illustrate usage. Check the actual CRD definitions in `config/crd/` for the exact API and field names once the operator is generated or installed from a released bundle.
+>**NOTE**: Ensure that the samples has default values to test it out.
 
-## Installation Options
+### To Uninstall
+**Delete the instances (CRs) from the cluster:**
 
-- Install from a release (TBD): When releases are published we will provide a `kubectl apply -f` bundle and a Helm chart.
-- Install from source:
-
-```bash
-# build the operator binary or container image
-# (example flow; project may use Go + controller-runtime / operator-sdk)
-make build
-make docker-build IMAGE=registry.example.com/garage-s3-operator:dev
-make deploy IMG=registry.example.com/garage-s3-operator:dev
+```sh
+kubectl delete -k config/samples/
 ```
 
-Replace the commands above with the repository's specific build and deploy steps once the project contains the build tooling.
+**Delete the APIs(CRDs) from the cluster:**
 
-## Development
-
-- Project layout will follow common operator patterns (e.g. `config/`, `api/`, `controllers/`).
-- Recommended stack: Go + controller-runtime (operator-sdk), plus unit & integration tests.
-- Run unit tests:
-
-```bash
-go test ./...
+```sh
+make uninstall
 ```
 
-- Local development tips:
-	- Use `kind` or `k3d` for a quick local cluster.
-	- Use `kubectl port-forward` and logs to debug the controller: `kubectl logs -l control-plane=controller-manager -n system` (adjust selector for actual deployment).
+**UnDeploy the controller from the cluster:**
 
-## CRD Examples & Best Practices
+```sh
+make undeploy
+```
 
-- Keep resource names predictable and include environment/context when needed (e.g., `teamA-backup-bucket`).
-- Store credentials in Kubernetes `Secrets` and limit RBAC to the least privilege required.
-- Use lifecycle settings to control retention and reduce storage costs.
+## Project Distribution
 
-## Roadmap / Next Steps
+Following the options to release and provide this solution to the users.
 
-- Define and publish stable CRD schema and examples.
-- Provide a Helm chart and release bundles for easy installation.
-- Add automated tests and CI for builds and integration tests.
-- Implement credential rotation, multi-backend connectors, and metrics.
+### By providing a bundle with all YAML files
 
-## Support & Contact
+1. Build the installer for the image built and published in the registry:
 
-For questions, feature requests, or support, open an issue in this repository.
+```sh
+make build-installer IMG=<some-registry>/garage-s3-operator:tag
+```
+
+**NOTE:** The makefile target mentioned above generates an 'install.yaml'
+file in the dist directory. This file contains all the resources built
+with Kustomize, which are necessary to install this project without its
+dependencies.
+
+2. Using the installer
+
+Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
+the project, i.e.:
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/<org>/garage-s3-operator/<tag or branch>/dist/install.yaml
+```
+
+### By providing a Helm Chart
+
+1. Build the chart using the optional helm plugin
+
+```sh
+operator-sdk edit --plugins=helm/v1-alpha
+```
+
+2. See that a chart was generated under 'dist/chart', and users
+can obtain this solution from there.
+
+**NOTE:** If you change the project, you need to update the Helm Chart
+using the same command above to sync the latest changes. Furthermore,
+if you create webhooks, you need to use the above command with
+the '--force' flag and manually ensure that any custom configuration
+previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
+is manually re-applied afterwards.
+
+## Contributing
+// TODO(user): Add detailed information on how you would like others to contribute to this project
+
+**NOTE:** Run `make help` for more information on all potential `make` targets
+
+More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
 
 ## License
 
-This repository will use an open-source license. If no `LICENSE` file is present, please consult the repository owner or maintainer to add the appropriate license (e.g., MIT, Apache-2.0).
+Copyright 2025.
 
----
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-If you'd like, I can also:
-- generate example CRD YAMLs under `config/crd/` and an example `examples/` resource,
-- scaffold a basic Go operator layout using the controller-runtime/`operator-sdk`, or
-- add a Helm chart and CI workflow for releases.
+    http://www.apache.org/licenses/LICENSE-2.0
 
-Tell me which next step you want and I'll proceed.
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
