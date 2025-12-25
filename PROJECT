@@ -10,4 +10,13 @@ plugins:
   scorecard.sdk.operatorframework.io/v2: {}
 projectName: garage-s3-operator
 repo: github.com/LordAntonius/garage-s3-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: garage.s3operator.fr
+  kind: GarageS3Instance
+  path: github.com/LordAntonius/garage-s3-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

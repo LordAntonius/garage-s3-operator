@@ -1,0 +1,6 @@
+## Append samples of your project ##
+namespace: garage-s3-operator-system
+resources:
+- v1alpha1_garages3instance.yaml
+- _v1alpha1_garages3instance.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

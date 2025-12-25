@@ -1,0 +1,88 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: garages3instances.garage.s3operator.fr
+spec:
+  group: garage.s3operator.fr
+  names:
+    kind: GarageS3Instance
+    listKind: GarageS3InstanceList
+    plural: garages3instances
+    singular: garages3instance
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: GarageS3Instance is the Schema for the garages3instances API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: GarageS3InstanceSpec defines the desired state of GarageS3Instance.
+            properties:
+              adminTokenSecret:
+                description: |-
+                  Secret where admin token for Garage admin API is stored.
+                  Token is found in field token.
+                type: string
+              port:
+                default: 3903
+                description: Port of Garage admin API
+                format: int32
+                maximum: 65535
+                minimum: 1
+                type: integer
+              url:
+                default: 127.0.0.1
+                description: URL of accessible Garage S3 instance.
+                type: string
+            required:
+            - adminTokenSecret
+            type: object
+          status:
+            description: GarageS3InstanceStatus defines the observed state of GarageS3Instance.
+            properties:
+              lastUpdated:
+                description: Timestamp of the last status update.
+                format: date-time
+                type: string
+              message:
+                description: Message providing more details about the connection status.
+                type: string
+              statusCode:
+                description: |-
+                  Status of the Garage S3 instance connection.
+                  HTTP-like numeric status code (allows wider range than uint8)
+                format: int32
+                maximum: 65535
+                minimum: 0
+                type: integer
+            required:
+            - lastUpdated
+            - message
+            - statusCode
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
