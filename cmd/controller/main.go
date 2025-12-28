@@ -10,6 +10,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 func init() {
@@ -48,5 +50,9 @@ func main() {
 		fmt.Printf("failed to get clientset: %v\n", err)
 		return
 	}
+
+	// Set logger
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+
 	fmt.Printf("clientset: %v\n", clienset)
 }
