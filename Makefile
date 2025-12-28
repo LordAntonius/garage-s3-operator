@@ -8,7 +8,7 @@ push:
 	$(DOCKER) push $(IMG)
 
 run:
-	go run ./cmd/controller/main.go
+	go run ./cmd/controller/*.go
 
 fmt:
 	gofmt -w .
