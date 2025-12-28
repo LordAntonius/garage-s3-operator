@@ -1,0 +1,67 @@
+# Source: garage/templates/service-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-headless
+  namespace: garage
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 3900
+      targetPort: 3900
+      protocol: TCP
+      name: s3-api
+    - port: 3902
+      targetPort: 3902
+      protocol: TCP
+      name: s3-web
+    - port: 3903
+      targetPort: 3903
+      protocol: TCP
+      name: s3-admin
+  selector:
+    app.kubernetes.io/name: garage
+    app.kubernetes.io/instance: garage
+---
+# Source: garage/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage
+  namespace: garage
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3900
+      targetPort: 3900
+      protocol: TCP
+      name: s3-api
+    - port: 3902
+      targetPort: 3902
+      protocol: TCP
+      name: s3-web
+    - port: 3903
+      targetPort: 3903
+      protocol: TCP
+      name: s3-admin
+  selector:
+    app.kubernetes.io/name: garage
+    app.kubernetes.io/instance: garage
+---
+# Source: garage/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage-webui
+  namespace: garage
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3909
+      targetPort: 3909
+      protocol: TCP
+      name: webui
+  selector:
+    app.kubernetes.io/name: garage-webui
+    app.kubernetes.io/instance: garage-webui

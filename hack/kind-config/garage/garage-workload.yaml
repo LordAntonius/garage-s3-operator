@@ -1,0 +1,141 @@
+# Source: garage/templates/workload.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: garage
+  namespace: garage
+spec:
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: garage
+      app.kubernetes.io/instance: garage
+  replicas: 1
+  serviceName: garage-headless
+  podManagementPolicy: OrderedReady
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: garage
+        app.kubernetes.io/instance: garage
+    spec:
+      serviceAccountName: garage
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: garage
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          image: "dxflrs/amd64_garage:v2.1.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3900
+              name: s3-api
+            - containerPort: 3902
+              name: web-api
+            - containerPort: 3903
+              name: admin
+          volumeMounts:
+            - name: meta
+              mountPath: /mnt/meta
+            - name: data
+              mountPath: /mnt/data
+            - name: garage-config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+            - name: garage-etc
+              mountPath: /etc
+          resources:
+            {}
+      volumes:
+        - name: garage-config
+          configMap:
+            name: garage-config
+            items:
+              - key: garage.toml
+                path: garage.toml
+        - name: garage-etc
+          emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: meta
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: "100Mi"
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: "1Gi"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: garage-webui
+  namespace: garage
+spec:
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: garage-webui
+      app.kubernetes.io/instance: garage-webui
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: garage-webui
+        app.kubernetes.io/instance: garage-webui
+    spec:
+      serviceAccountName: garage
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: garage-webui
+          image: khairul169/garage-webui:latest
+          ports:
+            - containerPort: 3909
+          env:
+          - name: API_BASE_URL
+            value: http://garage.garage.svc.cluster.local:3903
+          - name: S3_ENDPOINT_URL
+            value: http://garage.garage.svc.cluster.local:3900
+          - name: BASE_PATH
+            value: /garage
+          securityContext:           
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault 
+          volumeMounts:
+            - name: garage-config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+              readOnly: true
+            - name: garage-etc
+              mountPath: /etc
+      volumes:
+        - name: garage-config
+          configMap:
+            name: garage-config
+            items:
+              - key: garage.toml
+                path: garage.toml
+        - name: garage-etc
+          emptyDir: {}

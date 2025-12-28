@@ -1,0 +1,36 @@
+metadata_dir = "/mnt/meta"
+data_dir = "/mnt/data"
+
+db_engine = "lmdb"
+
+block_size = 1048576
+
+replication_factor = 2
+
+compression_level = 1
+
+rpc_bind_addr = "[::]:3901"
+
+rpc_secret = "ab01cd23ef45ab67cd89ef01ab23cd45ef67ab89cd01ef23ab45cd67ef89ab01"
+
+bootstrap_peers = []
+
+[kubernetes_discovery]
+namespace = "default"
+service_name = "garage"
+skip_crd = false
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = "garage.garage.svc.cluster.local"
+
+[s3_web]
+bind_addr = "[::]:3902"
+root_domain = ".static.abucquet.com"
+index = "index.html"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d"
+metrics_token = "1f2e3d4c5b6a79888796a5b4c3d2e1f0"
