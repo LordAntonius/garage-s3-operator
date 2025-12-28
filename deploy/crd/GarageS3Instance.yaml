@@ -1,0 +1,86 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: garages3instances.garage-s3-operator.abucquet.com
+spec:
+  group: garage-s3-operator.abucquet.com
+  scope: Namespaced
+  names:
+    plural: garages3instances
+    singular: garages3instance
+    kind: GarageS3Instance
+    shortNames:
+      - gs3i
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+          - spec
+          description: |
+            GarageS3Instance is the Schema for a Garage S3 instance.
+            It must be in the same namespace as the operator.
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec describes the specifications of the GarageS3Instance
+              type: object
+              properties:
+                url:
+                  type: string
+                  description: URL of accessible Garage S3 instance.
+                  default: 127.0.0.1
+                port:
+                  type: integer
+                  format: uint8
+                  description: Port of Garage admin API
+                  default: 3903
+                adminTokenSecret:
+                  type: string
+                  description: |
+                    Secret where admin token for Garage admin API is stored.
+                    Token is found in field token.
+              required:
+              - adminTokenSecret
+            status:
+              description: Observed status of the instance
+              type: object
+              properties:
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      statusCode:
+                        type: integer
+                        format: uint8
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                  required:
+                  - statusCode
+                  - message
+                  - lastTransitionTime
+      subresources:
+        status: {}

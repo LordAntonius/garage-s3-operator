@@ -6,10 +6,12 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the full project and build a static binary.
-COPY cmd/controller .
+COPY cmd ./cmd
+COPY api ./api
 # Build a statically linked binary with symbol stripping to reduce size
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-	go build -a -installsuffix cgo -ldflags "-s -w" -o /workspace/garage ./...
+	go build -a -installsuffix cgo -ldflags "-s -w" -o /workspace/garage ./cmd/controller
+
 
 FROM scratch
 # Copy the binary

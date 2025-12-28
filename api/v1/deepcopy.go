@@ -21,3 +21,24 @@ func (in *GarageS3Instance) DeepCopyObject() runtime.Object {
 
 	return &out
 }
+
+// DeepCopyInto copies the list and its items
+func (in *GarageS3InstanceList) DeepCopyInto(out *GarageS3InstanceList) {
+	out.TypeMeta = in.TypeMeta
+	out.ListMeta = in.ListMeta
+	if in.Items != nil {
+		out.Items = make([]GarageS3Instance, len(in.Items))
+		for i := range in.Items {
+			in.Items[i].DeepCopyInto(&out.Items[i])
+		}
+	} else {
+		out.Items = nil
+	}
+}
+
+// DeepCopyObject returns a generically typed copy of a list object
+func (in *GarageS3InstanceList) DeepCopyObject() runtime.Object {
+	out := GarageS3InstanceList{}
+	in.DeepCopyInto(&out)
+	return &out
+}

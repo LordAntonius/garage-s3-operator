@@ -1,6 +1,9 @@
 IMG=ghcr.io/lordantonius/garage-s3-operator:latest
 DOCKER=podman
 
+KIND_CONFIG=
+#KIND_CONFIG=--config ./hack/kind-config.yaml
+
 build:
 	$(DOCKER) build -t $(IMG) .
 
@@ -12,3 +15,13 @@ run:
 
 fmt:
 	gofmt -w .
+
+start-podman-kind: stop-podman-kind
+	KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --name garage-s3-operator $(KIND_CONFIG)
+
+stop-podman-kind:
+	KIND_EXPERIMENTAL_PROVIDER=podman kind delete cluster --name garage-s3-operator || true
+
+test: start-podman-kind build push
+	kubectl apply -f ./deploy/crd/
+
