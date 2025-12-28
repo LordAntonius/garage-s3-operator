@@ -2,8 +2,7 @@ FROM golang:1.25 AS builder
 WORKDIR /workspace
 
 # Download modules early to leverage layer caching
-COPY go.mod ./
-#COPY go.mod go.sum ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the full project and build a static binary.
