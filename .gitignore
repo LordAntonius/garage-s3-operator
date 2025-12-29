@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+env/
+venv/
+.venv/
+
+# virtualenvs created by uv
+hack/garage-init/.venv/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# Test / lint
+.pytest_cache/
+.mypy_cache/
+/.coverage
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+thumbs.db
+
+# Docker
+*.tar
+
+# Logs
+*.log
+
+# Misc
+**/secrets.yaml
+.env

@@ -72,14 +72,14 @@ spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
-          storage: "100Mi"
+          storage: "10Mi"
   - metadata:
       name: data
     spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
-          storage: "1Gi"
+          storage: "100Mi"
 ---
 apiVersion: apps/v1
 kind: Deployment

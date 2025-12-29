@@ -4,6 +4,7 @@ namespace: garage
 
 resources:
   - garage-namespace.yaml
+  - garage-crd.yaml
   - garage-sa.yaml
   - garage-svc.yaml
   - garage-workload.yaml

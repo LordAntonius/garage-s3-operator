@@ -1,0 +1,43 @@
+kind: CustomResourceDefinition
+apiVersion: apiextensions.k8s.io/v1
+metadata:
+  name: garagenodes.deuxfleurs.fr
+spec:
+  group: deuxfleurs.fr
+  names:
+    plural: garagenodes
+    singular: garagenode
+    kind: GarageNode
+    listKind: GarageNodeList
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: Auto-generated derived type for Node via `CustomResource`
+          type: object
+          title: GarageNode
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - address
+                - hostname
+                - port
+              properties:
+                address:
+                  type: string
+                  format: ip
+                hostname:
+                  type: string
+                port:
+                  type: integer
+                  format: uint16
+                  minimum: 0
+      subresources: {}
+  conversion:
+    strategy: None

@@ -5,7 +5,7 @@ db_engine = "lmdb"
 
 block_size = 1048576
 
-replication_factor = 2
+replication_factor = 1
 
 compression_level = 1
 
@@ -16,9 +16,9 @@ rpc_secret = "ab01cd23ef45ab67cd89ef01ab23cd45ef67ab89cd01ef23ab45cd67ef89ab01"
 bootstrap_peers = []
 
 [kubernetes_discovery]
-namespace = "default"
+namespace = "garage"
 service_name = "garage"
-skip_crd = false
+skip_crd = true
 
 [s3_api]
 s3_region = "garage"

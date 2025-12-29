@@ -1,0 +1,7 @@
+[project]
+name = "garage-init"
+version = "0.1.0"
+description = "Minimal uv-managed app that calls a REST API"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["requests"]

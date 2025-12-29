@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: garage-init
+  namespace: garage
+  labels:
+    app: garage-init
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: garage-init
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: garage-init
+          image: ghcr.io/lordantonius/garage-init:latest
+          imagePullPolicy: Always
+          env:
+            - name: GARAGE_URL
+              value: "garage.garage.svc.cluster.local"
+            - name: GARAGE_PORT
+              value: "3903"
+            - name: GARAGE_CAPACITY
+              value: "100M"
+          volumeMounts:
+            - name: garage-config
+              mountPath: /etc/garage.toml
+              subPath: garage.toml
+      volumes:
+        - name: garage-config
+          configMap:
+            name: garage-config
+            items:
+              - key: garage.toml
+                path: garage.toml
