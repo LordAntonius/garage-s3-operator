@@ -38,3 +38,4 @@ thumbs.db
 # Misc
 **/secrets.yaml
 .env
+tmp/

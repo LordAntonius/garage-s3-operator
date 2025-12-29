@@ -55,20 +55,20 @@ func main() {
 	// Retrieve Kubernetes clientset
 	clientset, config, err := getClientSetAndConfig()
 	if err != nil {
-		fmt.Printf("failed to get clientset: %v\n", err)
+		fmt.Printf("Failed to get clientset: %v\n", err)
 		return
 	}
 
 	// Set logger
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
-	setupLog := ctrl.Log.WithName("setup")
+	setupLog := ctrl.Log.WithName("Setup")
 
 	// Start controller manager
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "Unable to start manager")
 		return
 	}
 
@@ -80,13 +80,13 @@ func main() {
 			kubeClient: clientset,
 		})
 	if err != nil {
-		setupLog.Error(err, "unable to create controller")
+		setupLog.Error(err, "Unable to create controller")
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	setupLog.Info("Starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "Problem running manager")
 		os.Exit(1)
 	}
 

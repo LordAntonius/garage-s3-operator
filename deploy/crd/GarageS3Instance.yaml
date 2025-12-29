@@ -70,16 +70,21 @@ spec:
                   items:
                     type: object
                     properties:
-                      statusCode:
-                        type: integer
-                        format: uint8
+                      status:
+                        type: string
+                        description: "Observed condition status"
+                        enum:
+                          - healthy
+                          - degraded
+                          - unavailable
+                          - error
                       message:
                         type: string
                       lastTransitionTime:
                         type: string
                         format: date-time
                   required:
-                  - statusCode
+                  - status
                   - message
                   - lastTransitionTime
       subresources:
