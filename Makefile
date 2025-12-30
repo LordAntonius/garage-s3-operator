@@ -30,7 +30,9 @@ stop-podman-kind:
 
 test: deploy-garage build push
 	kubectl apply -f ./deploy/crd/
-	
 
+test-deployment: test
+	kubectl apply -k ./deploy/operator/
+	
 clean: stop-podman-kind
 

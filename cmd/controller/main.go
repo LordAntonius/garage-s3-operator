@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
@@ -65,11 +66,21 @@ func main() {
 
 	// Start controller manager
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
-		Scheme: scheme,
+		Scheme:                 scheme,
+		HealthProbeBindAddress: ":8081",
 	})
 	if err != nil {
 		setupLog.Error(err, "Unable to start manager")
 		return
+	}
+	// register simple health & readiness checks
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to add healthz check")
+		os.Exit(1)
+	}
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		setupLog.Error(err, "unable to add readyz check")
+		os.Exit(1)
 	}
 
 	err = ctrl.NewControllerManagedBy(mgr).

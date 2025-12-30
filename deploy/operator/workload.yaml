@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: garage-s3-operator
+  labels:
+    app: garage-s3-operator
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: garage-s3-operator
+  template:
+    metadata:
+      labels:
+        app: garage-s3-operator
+    spec:
+      serviceAccountName: garage-s3-operator  # RBAC skipped as requested
+      containers:
+        - name: garage-s3-operator
+          image: ghcr.io/lordantonius/garage-s3-operator:latest
+          imagePullPolicy: Always
+          ports:
+            - name: webhook
+              containerPort: 9443
+            - name: health
+              containerPort: 8081
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources: {}
