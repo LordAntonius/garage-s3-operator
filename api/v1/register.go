@@ -20,6 +20,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&GarageS3Instance{},
 		&GarageS3InstanceList{},
+		&GarageS3AccessKey{},
+		&GarageS3AccessKeyList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

@@ -1,0 +1,15 @@
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3AccessKey
+metadata:
+  name: example-accesskey
+  namespace: default
+spec:
+  # Name of the GarageS3Instance this Access Key refers to (required field)
+  instanceRef:
+    name: example-instance
+    namespace: garage
+  # canCreateBucket: true
+  # # Expiration in RFC3339 format. Example: 2026-01-30T12:00:00Z
+  #expiration: "2030-01-30T12:00:00Z"
+  # # Set to false to use the expiration above. If true, the key never expires.
+  #neverExpires: false

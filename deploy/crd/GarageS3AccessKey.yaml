@@ -1,0 +1,111 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: garages3accesskeys.garage-s3-operator.abucquet.com
+spec:
+  group: garage-s3-operator.abucquet.com
+  scope: Namespaced
+  names:
+    plural: garages3accesskeys
+    singular: garages3accesskey
+    kind: GarageS3AccessKey
+    shortNames:
+      - gs3ak
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+          - spec
+          description: |
+            GarageS3AccessKey is the Schema for an S3 Access Key related to Garage S3 Instance.
+            It can be in any namespace.
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec describes the specifications of the GarageS3Instance
+              type: object
+              properties:
+                instanceRef:
+                  type: object
+                  description: Reference to the GarageS3Instance (name + namespace) this AccessKey belongs to.
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the GarageS3Instance
+                    namespace:
+                      type: string
+                      description: Namespace of the GarageS3Instance
+                  required:
+                    - name
+                    - namespace
+                canCreateBucket:
+                  type: boolean
+                  description: Whether this Access Key can create buckets
+                  default: false
+                expiration:
+                  type: string
+                  description: Expiration date of the Access Key in RFC3339 format
+                  default: ""
+                neverExpires:
+                  type: boolean
+                  description: Whether this Access Key never expires
+                  default: true
+            status:
+              description: Observed status of the AccessKey
+              type: object
+              properties:
+                secret:
+                  type: string
+                  description: Secret it refers to
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        description: "Observed condition status"
+                        enum:
+                          - "True"
+                          - "False"
+                          - "Unknown"
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                  required:
+                  - type
+                  - status
+                  - reason
+                  - message
+                  - lastTransitionTime
+      subresources:
+        status: {}
