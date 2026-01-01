@@ -15,6 +15,21 @@ func (in *GarageS3Instance) DeepCopyInto(out *GarageS3Instance) {
 		Port:             in.Spec.Port,
 		AdminTokenSecret: in.Spec.AdminTokenSecret,
 	}
+	// Copy status
+	if in.Status.Conditions != nil {
+		out.Status.Conditions = make([]metav1.Condition, len(in.Status.Conditions))
+		for i := range in.Status.Conditions {
+			out.Status.Conditions[i] = metav1.Condition{
+				Type:               in.Status.Conditions[i].Type,
+				Status:             in.Status.Conditions[i].Status,
+				Reason:             in.Status.Conditions[i].Reason,
+				Message:            in.Status.Conditions[i].Message,
+				LastTransitionTime: in.Status.Conditions[i].LastTransitionTime,
+			}
+		}
+	} else {
+		out.Status.Conditions = nil
+	}
 }
 
 // DeepCopyObject returns a generically typed copy of an object

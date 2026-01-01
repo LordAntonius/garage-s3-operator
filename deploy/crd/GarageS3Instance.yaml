@@ -62,29 +62,40 @@ spec:
               required:
               - adminTokenSecret
             status:
-              description: Observed status of the instance
+              description: Observed status of the AccessKey
               type: object
               properties:
+                secret:
+                  type: string
+                  description: Secret it refers to
                 conditions:
                   type: array
                   items:
                     type: object
                     properties:
+                      type:
+                        type: string
                       status:
                         type: string
                         description: "Observed condition status"
                         enum:
-                          - healthy
-                          - degraded
-                          - unavailable
-                          - error
+                          - "True"
+                          - "False"
+                          - "Unknown"
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                      reason:
+                        type: string
                       message:
                         type: string
                       lastTransitionTime:
                         type: string
                         format: date-time
                   required:
+                  - type
                   - status
+                  - reason
                   - message
                   - lastTransitionTime
       subresources:

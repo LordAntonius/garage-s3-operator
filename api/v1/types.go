@@ -30,14 +30,7 @@ type GarageS3InstanceSpec struct {
 
 // GarageS3InstanceStatus represents the observed state of the GarageS3Instance.
 type GarageS3InstanceStatus struct {
-	Conditions []GarageS3Condition `json:"conditions,omitempty"`
-}
-
-// GarageS3Condition describes a condition for the instance.
-type GarageS3Condition struct {
-	Status             string      `json:"status"`
-	Message            string      `json:"message"`
-	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 /* **************************************
@@ -62,9 +55,9 @@ type GarageS3AccessKeyList struct {
 
 type GarageS3AccessKeySpec struct {
 	InstanceRef     GarageS3InstanceRef `json:"instanceRef"`
-	CanCreateBucket bool                 `json:"canCreateBucket,omitempty"`
-	Expiration      string               `json:"expiration,omitempty"`
-	NeverExpires    bool                 `json:"neverExpires,omitempty"`
+	CanCreateBucket bool                `json:"canCreateBucket,omitempty"`
+	Expiration      string              `json:"expiration,omitempty"`
+	NeverExpires    bool                `json:"neverExpires,omitempty"`
 }
 
 // GarageS3InstanceRef references a GarageS3Instance by name and namespace.
