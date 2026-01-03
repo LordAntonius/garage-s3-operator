@@ -97,8 +97,8 @@ type GarageS3BucketSpec struct {
 	// Reference to the GarageS3Instance (name + namespace) this Bucket belongs to.
 	InstanceRef GarageS3InstanceRef `json:"instanceRef"`
 
-	// Whether the bucket is configured as a website bucket
-	Website bool `json:"website,omitempty"`
+	// Website access configuration for the bucket
+	WebsiteAccess *GarageS3WebsiteAccess `json:"websiteAccess,omitempty"`
 
 	// Optional quota in buckets or bytes to apply to this bucket
 	Quota *GarageS3BucketQuota `json:"quota,omitempty"`
@@ -112,8 +112,18 @@ type GarageS3BucketSpec struct {
 
 // GarageS3BucketQuota describes optional quota limits
 type GarageS3BucketQuota struct {
-	MaxBuckets *int32 `json:"maxBuckets,omitempty"`
+	MaxObjects *int64 `json:"maxObjects,omitempty"`
 	MaxBytes   *int64 `json:"maxBytes,omitempty"`
+}
+
+// GarageS3WebsiteAccess describes website access configuration for a bucket
+type GarageS3WebsiteAccess struct {
+	// Enabled controls whether the bucket is configured as a website
+	Enabled bool `json:"enabled"`
+	// IndexDocument is the name of the index document (e.g., index.html)
+	IndexDocument string `json:"indexDocument,omitempty"`
+	// ErrorDocument is the name of the error document (e.g., error.html)
+	ErrorDocument string `json:"errorDocument,omitempty"`
 }
 
 // GarageS3BucketPermission represents an ACL/permission to grant on the bucket

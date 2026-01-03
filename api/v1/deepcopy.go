@@ -134,16 +134,25 @@ func (in *GarageS3Bucket) DeepCopyInto(out *GarageS3Bucket) {
 			Name:      in.Spec.InstanceRef.Name,
 			Namespace: in.Spec.InstanceRef.Namespace,
 		},
-		Website: in.Spec.Website,
+	}
+
+	if in.Spec.WebsiteAccess != nil {
+		out.Spec.WebsiteAccess = &GarageS3WebsiteAccess{
+			Enabled:       in.Spec.WebsiteAccess.Enabled,
+			IndexDocument: in.Spec.WebsiteAccess.IndexDocument,
+			ErrorDocument: in.Spec.WebsiteAccess.ErrorDocument,
+		}
+	} else {
+		out.Spec.WebsiteAccess = nil
 	}
 
 	if in.Spec.Quota != nil {
 		out.Spec.Quota = &GarageS3BucketQuota{}
-		if in.Spec.Quota.MaxBuckets != nil {
-			mb := *in.Spec.Quota.MaxBuckets
-			out.Spec.Quota.MaxBuckets = &mb
+		if in.Spec.Quota.MaxObjects != nil {
+			mb := *in.Spec.Quota.MaxObjects
+			out.Spec.Quota.MaxObjects = &mb
 		} else {
-			out.Spec.Quota.MaxBuckets = nil
+			out.Spec.Quota.MaxObjects = nil
 		}
 		if in.Spec.Quota.MaxBytes != nil {
 			mb := *in.Spec.Quota.MaxBytes

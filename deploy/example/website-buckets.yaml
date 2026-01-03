@@ -1,0 +1,38 @@
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: website-bucket1
+  namespace: garage
+spec:
+  instanceRef:
+    name: example-instance
+    namespace: garage
+  websiteAccess:
+    enabled: true
+    indexDocument: accueil.html
+    errorDocument: error.html
+---
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: website-bucket2
+  namespace: garage
+spec:
+  instanceRef:
+    name: example-instance
+    namespace: garage
+  websiteAccess:
+    enabled: true
+---
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: website-bucket3
+  namespace: garage
+spec:
+  instanceRef:
+    name: example-instance
+    namespace: garage
+  websiteAccess:
+    enabled: false
+---

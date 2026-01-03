@@ -1,0 +1,36 @@
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: quota-bucket1
+  namespace: garage
+spec:
+  instanceRef:
+    name: example-instance
+    namespace: garage
+  quota:
+    maxBytes: 10000
+---
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: quota-bucket2
+  namespace: garage
+spec:
+  instanceRef:
+    name: example-instance
+    namespace: garage
+  quota:
+    maxObjects: 10
+---
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: quota-bucket3
+  namespace: garage
+spec:
+  instanceRef:
+    name: example-instance
+    namespace: garage
+  quota:
+    maxBytes: 10000
+    maxObjects: 10

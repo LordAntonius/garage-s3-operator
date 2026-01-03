@@ -58,16 +58,31 @@ spec:
                   required:
                     - name
                     - namespace
-                website:
-                  type: boolean
-                  description: Whether the bucket is configured as a website bucket
+                websiteAccess:
+                  type: object
+                  description: Bucket website access configuration
+                  properties:
+                    enabled:
+                      type: boolean
+                      description: Whether website access is enabled for this bucket
+                      default: false
+                    indexDocument:
+                      type: string
+                      description: Name of the index document (e.g., index.html)
+                      default: index.html
+                    errorDocument:
+                      type: string
+                      description: Name of the error document (e.g., error.html)
+                      default: error/400.html
+                  required:
+                    - enabled
                 quota:
                   type: object
                   description: Optional quota in buckets or bytes to apply to this bucket
                   properties:
-                    maxBuckets:
+                    maxObjects:
                       type: integer
-                      format: int32
+                      format: int64
                       description: Maximum number of objects allowed in the bucket
                     maxBytes:
                       type: integer
