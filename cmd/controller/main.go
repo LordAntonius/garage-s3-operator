@@ -83,6 +83,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Controller for GarageS3Instance
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&garageS3types.GarageS3Instance{}).
 		Complete(&instance_reconciler{
@@ -95,6 +96,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Controller for GarageS3AccessKey
 	err = ctrl.NewControllerManagedBy(mgr).
 		For(&garageS3types.GarageS3AccessKey{}).
 		Complete(&accessKeyReconciler{
@@ -104,6 +106,19 @@ func main() {
 		})
 	if err != nil {
 		setupLog.Error(err, "Unable to create accesskey controller")
+		os.Exit(1)
+	}
+
+	// Controller for GarageS3Bucket
+	err = ctrl.NewControllerManagedBy(mgr).
+		For(&garageS3types.GarageS3Bucket{}).
+		Complete(&bucket_reconciler{
+			Client:     mgr.GetClient(),
+			scheme:     mgr.GetScheme(),
+			kubeClient: clientset,
+		})
+	if err != nil {
+		setupLog.Error(err, "Unable to create bucket controller")
 		os.Exit(1)
 	}
 

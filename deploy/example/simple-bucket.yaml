@@ -1,0 +1,9 @@
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: simple-bucket
+  namespace: garage
+spec:
+  instanceRef:
+    name: example-instance
+    namespace: garage

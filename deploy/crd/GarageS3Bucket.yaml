@@ -1,0 +1,145 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: garages3buckets.garage-s3-operator.abucquet.com
+spec:
+  group: garage-s3-operator.abucquet.com
+  scope: Namespaced
+  names:
+    plural: garages3buckets
+    singular: garages3bucket
+    kind: GarageS3Bucket
+    shortNames:
+      - gs3b
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+          - spec
+          description: |
+            GarageS3Bucket is the Schema for an S3 Bucket related to Garage S3 Instance.
+            It can be in any namespace.
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: Spec describes the specifications of the GarageS3Instance
+              type: object
+              properties:
+                instanceRef:
+                  type: object
+                  description: Reference to the GarageS3Instance (name + namespace) this Bucket belongs to.
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the GarageS3Instance
+                    namespace:
+                      type: string
+                      description: Namespace of the GarageS3Instance
+                  required:
+                    - name
+                    - namespace
+                website:
+                  type: boolean
+                  description: Whether the bucket is configured as a website bucket
+                quota:
+                  type: object
+                  description: Optional quota in buckets or bytes to apply to this bucket
+                  properties:
+                    maxBuckets:
+                      type: integer
+                      format: int32
+                      description: Maximum number of objects allowed in the bucket
+                    maxBytes:
+                      type: integer
+                      format: int64
+                      description: Maximum total size in bytes allowed in the bucket
+                additionalAliases:
+                  type: array
+                  description: List of additional aliases associated with this bucket
+                  items:
+                    type: string
+                permissions:
+                  type: array
+                  description: List of permissions to apply to this bucket
+                  items:
+                    type: object
+                    properties:
+                      accessKeyName:
+                        type: string
+                        description: Name of the GarageS3AccessKey to which to apply the permission
+                      read:
+                        type: boolean
+                        description: Whether to grant read permission
+                        default: false
+                      write:
+                        type: boolean
+                        description: Whether to grant write permission
+                        default: false
+                      owner:
+                        type: boolean
+                        description: Whether to grant owner permission
+                        default: false
+                    required:
+                      - accessKeyName
+                      - read
+                      - write
+                      - owner
+              required:
+              - instanceRef
+            status:
+              description: Observed status of the Bucket
+              type: object
+              properties:
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        description: "Observed condition status"
+                        enum:
+                          - "True"
+                          - "False"
+                          - "Unknown"
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                  required:
+                  - type
+                  - status
+                  - reason
+                  - message
+                  - lastTransitionTime
+
+      subresources:
+        status: {}

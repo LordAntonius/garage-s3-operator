@@ -28,10 +28,10 @@ deploy-garage: start-podman-kind
 stop-podman-kind:
 	KIND_EXPERIMENTAL_PROVIDER=podman kind delete cluster --name garage-s3-operator || true
 
-test: deploy-garage build push
+deploy-crd: deploy-garage build push
 	kubectl apply -f ./deploy/crd/
 
-test-deployment: test
+deploy: deploy-crd
 	kubectl apply -k ./deploy/operator/
 	
 clean: stop-podman-kind

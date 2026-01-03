@@ -71,3 +71,67 @@ type GarageS3AccessKeyStatus struct {
 	Secret     string             `json:"secret,omitempty"`
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
+
+/* **************************************
+   GarageS3Bucket API Schema and types
+ **************************************/
+
+// GarageS3Bucket is the Schema for an S3 Bucket related to a Garage S3 Instance.
+type GarageS3Bucket struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   GarageS3BucketSpec   `json:"spec"`
+	Status GarageS3BucketStatus `json:"status,omitempty"`
+}
+
+// GarageS3BucketList contains a list of GarageS3Bucket
+type GarageS3BucketList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []GarageS3Bucket `json:"items"`
+}
+
+// GarageS3BucketSpec describes the desired state of a Bucket.
+type GarageS3BucketSpec struct {
+	// Reference to the GarageS3Instance (name + namespace) this Bucket belongs to.
+	InstanceRef GarageS3InstanceRef `json:"instanceRef"`
+
+	// Whether the bucket is configured as a website bucket
+	Website bool `json:"website,omitempty"`
+
+	// Optional quota in buckets or bytes to apply to this bucket
+	Quota *GarageS3BucketQuota `json:"quota,omitempty"`
+
+	// List of additional aliases associated with this bucket
+	AdditionalAliases []string `json:"additionalAliases,omitempty"`
+
+	// List of permissions to apply to this bucket
+	Permissions []GarageS3BucketPermission `json:"permissions,omitempty"`
+}
+
+// GarageS3BucketQuota describes optional quota limits
+type GarageS3BucketQuota struct {
+	MaxBuckets *int32 `json:"maxBuckets,omitempty"`
+	MaxBytes   *int64 `json:"maxBytes,omitempty"`
+}
+
+// GarageS3BucketPermission represents an ACL/permission to grant on the bucket
+type GarageS3BucketPermission struct {
+	// Name of the GarageS3AccessKey to which to apply the permission
+	AccessKeyName string `json:"accessKeyName"`
+
+	// Grant read permission
+	Read bool `json:"read,omitempty"`
+
+	// Grant write permission
+	Write bool `json:"write,omitempty"`
+
+	// Grant owner permission
+	Owner bool `json:"owner,omitempty"`
+}
+
+// GarageS3BucketStatus represents the observed state of the Bucket
+type GarageS3BucketStatus struct {
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
