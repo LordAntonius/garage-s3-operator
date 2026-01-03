@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	v1 "abucquet.com/garage-s3-operator/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,6 +18,8 @@ type instance_reconciler struct {
 	scheme     *runtime.Scheme
 	kubeClient *kubernetes.Clientset
 }
+
+const instanceFinalizer = "garage.abucquet.com/finalizer"
 
 func (r *instance_reconciler) UpdateStatus(ctx context.Context, status metav1.ConditionStatus, reason string, message string, instance *v1.GarageS3Instance) {
 	cond := metav1.Condition{
@@ -49,17 +52,83 @@ func (r *instance_reconciler) UpdateStatus(ctx context.Context, status metav1.Co
 	}
 }
 
+func (r *instance_reconciler) AddFinalizer(ctx context.Context, instance *v1.GarageS3Instance) error {
+	if instance.ObjectMeta.DeletionTimestamp == nil {
+		has := false
+		for _, f := range instance.ObjectMeta.Finalizers {
+			if f == instanceFinalizer {
+				has = true
+				break
+			}
+		}
+		if !has {
+			instance.ObjectMeta.Finalizers = append(instance.ObjectMeta.Finalizers, instanceFinalizer)
+			return r.Update(ctx, instance)
+		}
+	}
+	return nil
+}
+
+func (r *instance_reconciler) HasChildren(ctx context.Context, instance *v1.GarageS3Instance) (bool, error) {
+	accessKeyList := &v1.GarageS3AccessKeyList{}
+	if err := r.List(ctx, accessKeyList); err != nil {
+		return true, err
+	}
+
+	for _, key := range accessKeyList.Items {
+		if key.Spec.InstanceRef.Name == instance.Name && key.Spec.InstanceRef.Namespace == instance.Namespace {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *instance_reconciler) RemoveFinalizer(ctx context.Context, instance *v1.GarageS3Instance) error {
+	orig := instance.DeepCopyObject().(client.Object)
+	newFinalizers := []string{}
+	for _, f := range instance.ObjectMeta.Finalizers {
+		if f != instanceFinalizer {
+			newFinalizers = append(newFinalizers, f)
+		}
+	}
+	instance.ObjectMeta.Finalizers = newFinalizers
+	return r.Patch(ctx, instance, client.MergeFrom(orig))
+}
+
 func (r *instance_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx).WithValues("GarageS3Instance", req.NamespacedName)
 
 	instance := &v1.GarageS3Instance{}
-	err := r.Get(ctx, req.NamespacedName, instance)
-	// If object does not exist, it means deletion
-	if err != nil {
-		log.Info("Deleted GarageS3Instance")
+	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
-		// TODO: delete associated resources
+	// Add finalizer if not present
+	if err := r.AddFinalizer(ctx, instance); err != nil {
+		log.Error(err, "Failed to add finalizer to Garage S3 instance")
+		return ctrl.Result{}, err
+	}
+
+	// Handle deletion
+	if instance.ObjectMeta.DeletionTimestamp != nil {
+		// Check for child resources
+		hasChildren, err := r.HasChildren(ctx, instance)
+		if err != nil {
+			log.Error(err, "Failed to check for child resources")
+			return ctrl.Result{}, err
+		}
+		if hasChildren {
+			log.Info("Cannot delete Garage S3 instance, child resources exist")
+			r.UpdateStatus(ctx, metav1.ConditionFalse, "ChildResourcesExist", "Cannot delete Garage S3 instance, child resources exist", instance)
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+		}
+
+		// Remove finalizer
+		if err := r.RemoveFinalizer(ctx, instance); err != nil {
+			log.Error(err, "Failed to remove finalizer from Garage S3 instance")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	}
 
 	// Create client to Garage S3 instance
