@@ -1,0 +1,14 @@
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: permission-bucket
+  namespace: default
+spec:
+  instanceRef:
+    name: example-instance
+    namespace: garage
+  permissions:
+  - accessKeyName: example-accesskey
+    owner: true
+    read: true
+    write: true

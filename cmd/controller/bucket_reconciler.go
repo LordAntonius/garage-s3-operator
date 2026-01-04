@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	v1 "abucquet.com/garage-s3-operator/api/v1"
 	garage "git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang"
@@ -12,6 +13,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+type AccessKeyPerm struct {
+	Name        string
+	AccessKeyID string
+	Owner       bool
+	Read        bool
+	Write       bool
+}
 
 type bucket_reconciler struct {
 	client.Client
@@ -74,6 +83,175 @@ func (r *bucket_reconciler) GetBucketWebsiteAccess(bucket *v1.GarageS3Bucket) ga
 		ErrorDocument: *garage.NewNullableString(&bucket.Spec.WebsiteAccess.ErrorDocument),
 	}
 	return *garage.NewNullableUpdateBucketWebsiteAccess(&wa)
+}
+
+func (r *bucket_reconciler) GetAccessKeyForName(name string, namespace string) (string, error) {
+	// Look for GarageS3AccessKey with the given name, in the same namespace as the bucket
+	accessKey := &v1.GarageS3AccessKey{}
+	err := r.Get(context.TODO(), client.ObjectKey{
+		Name:      name,
+		Namespace: namespace,
+	}, accessKey)
+	if err != nil {
+		return "", err
+	}
+	// Retrieve the AccessKeyID from the associated secret
+	secretName := accessKey.Status.Secret
+	secret, err := r.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), secretName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	// AccessKeyID is stored in "AWS_ACCESS_KEY" key in the secret data
+	accessKeyID := string(secret.Data["AWS_ACCESS_KEY"])
+	return accessKeyID, nil
+}
+
+func (r *bucket_reconciler) GetAllBucketPermInfo(bucket *v1.GarageS3Bucket) ([]AccessKeyPerm, error) {
+	var perms []AccessKeyPerm
+	oneNotFoundErr := false
+	for _, p := range bucket.Spec.Permissions {
+		accessKeyID, err := r.GetAccessKeyForName(p.AccessKeyName, bucket.Namespace)
+		if err != nil {
+			oneNotFoundErr = true
+			continue
+		}
+		perm := AccessKeyPerm{
+			Name:        p.AccessKeyName,
+			AccessKeyID: accessKeyID,
+			Owner:       p.Owner,
+			Read:        p.Read,
+			Write:       p.Write,
+		}
+		perms = append(perms, perm)
+	}
+	if oneNotFoundErr {
+		return perms, fmt.Errorf("one or more AccessKeys not found for bucket permissions")
+	}
+	return perms, nil
+}
+
+// ptrBoolVal returns the value of a *bool, treating nil as false.
+func ptrBoolVal(b *bool) bool {
+	if b == nil {
+		return false
+	}
+	return *b
+}
+func boolPtr(b bool) *bool { v := b; return &v }
+
+func (r *bucket_reconciler) GetBucketPermissionChangeRequests(bucket *v1.GarageS3Bucket, bucketInfo *garage.GetBucketInfoResponse) ([]garage.BucketKeyPermChangeRequest, []garage.BucketKeyPermChangeRequest, error) {
+
+	accessKeyInfos, err := r.GetAllBucketPermInfo(bucket) // Error if one or more AccessKeys not found
+
+	var allowRequests []garage.BucketKeyPermChangeRequest
+	var denyRequests []garage.BucketKeyPermChangeRequest
+
+	for _, ak := range accessKeyInfos {
+		found := false
+		foundPerm := garage.ApiBucketKeyPerm{}
+		for _, existingPerm := range bucketInfo.Keys {
+			// Found existing permission for this access key
+			if ak.AccessKeyID == existingPerm.AccessKeyId {
+				found = true
+				foundPerm = existingPerm.Permissions
+				break
+			}
+		}
+		if !found {
+			// Not found, create request
+			// make local copies so each pointer refers to a distinct value
+			owner := ak.Owner
+			read := ak.Read
+			write := ak.Write
+			req := garage.BucketKeyPermChangeRequest{
+				AccessKeyId: ak.AccessKeyID,
+				BucketId:    bucketInfo.Id,
+				Permissions: garage.ApiBucketKeyPerm{
+					Owner: &owner,
+					Read:  &read,
+					Write: &write,
+				},
+			}
+			allowRequests = append(allowRequests, req)
+		} else {
+			// Found, check for updates
+			add := false
+			rem := false
+			allowReq := garage.BucketKeyPermChangeRequest{
+				AccessKeyId: ak.AccessKeyID,
+				BucketId:    bucketInfo.Id,
+				Permissions: garage.ApiBucketKeyPerm{
+					Owner: boolPtr(false),
+					Read:  boolPtr(false),
+					Write: boolPtr(false),
+				},
+			}
+			denyReq := garage.BucketKeyPermChangeRequest{
+				AccessKeyId: ak.AccessKeyID,
+				BucketId:    bucketInfo.Id,
+				Permissions: garage.ApiBucketKeyPerm{
+					Owner: boolPtr(false),
+					Read:  boolPtr(false),
+					Write: boolPtr(false),
+				},
+			}
+			if ak.Owner != ptrBoolVal(foundPerm.Owner) {
+				if ak.Owner {
+					allowReq.Permissions.Owner = boolPtr(true)
+					add = true
+				} else {
+					denyReq.Permissions.Owner = boolPtr(true)
+					rem = true
+				}
+			}
+			if ak.Read != ptrBoolVal(foundPerm.Read) {
+				if ak.Read {
+					allowReq.Permissions.Read = boolPtr(true)
+					add = true
+				} else {
+					denyReq.Permissions.Read = boolPtr(true)
+					rem = true
+				}
+			}
+			if ak.Write != ptrBoolVal(foundPerm.Write) {
+				if ak.Write {
+					allowReq.Permissions.Write = boolPtr(true)
+					add = true
+				} else {
+					denyReq.Permissions.Write = boolPtr(true)
+					rem = true
+				}
+			}
+			if add {
+				allowRequests = append(allowRequests, allowReq)
+			}
+			if rem {
+				denyRequests = append(denyRequests, denyReq)
+			}
+		}
+	}
+
+	// Run through existing permissions to find any to remove
+	for _, existingPerm := range bucketInfo.Keys {
+		found := false
+		for _, ak := range accessKeyInfos {
+			if ak.AccessKeyID == existingPerm.AccessKeyId {
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Existing permission not found in desired permissions, remove it
+			req := garage.BucketKeyPermChangeRequest{
+				AccessKeyId: existingPerm.AccessKeyId,
+				BucketId:    bucketInfo.Id,
+				Permissions: existingPerm.Permissions,
+			}
+			denyRequests = append(denyRequests, req)
+		}
+	}
+
+	return allowRequests, denyRequests, err
 }
 
 func (r *bucket_reconciler) UpdateStatus(ctx context.Context, status metav1.ConditionStatus, reason string, message string, instance *v1.GarageS3Bucket) {
@@ -169,11 +347,32 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Update Bucket parameters
-	ubReq := garage.UpdateBucketRequestBody{
+	updateBucketReq := garage.UpdateBucketRequestBody{
 		Quotas:        r.GetBucketQuota(bucket),
 		WebsiteAccess: r.GetBucketWebsiteAccess(bucket),
 	}
-	garageClient.BucketAPI.UpdateBucket(apiCtx).Id(bucketInfo.Id).UpdateBucketRequestBody(ubReq).Execute()
+	garageClient.BucketAPI.UpdateBucket(apiCtx).Id(bucketInfo.Id).UpdateBucketRequestBody(updateBucketReq).Execute()
 
-	return ctrl.Result{}, nil
+	// Handle permissions
+	allowReq, denyReq, err := r.GetBucketPermissionChangeRequests(bucket, bucketInfo)
+	// In case of error, some AccessKeys were not found, but we can still process the others
+	// error means it is needed to requeue later
+	for _, req := range allowReq {
+		_, _, err := garageClient.PermissionAPI.AllowBucketKey(apiCtx).Body(req).Execute()
+		if err != nil {
+			log.Error(err, "Failed to allow bucket key permission", "BucketName", bucket.Name, "BucketID", bucketInfo.Id, "AccessKeyID", req.AccessKeyId)
+			r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when updating bucket permissions in Garage S3", bucket)
+			return ctrl.Result{}, err
+		}
+	}
+	for _, req := range denyReq {
+		_, _, err := garageClient.PermissionAPI.DenyBucketKey(apiCtx).Body(req).Execute()
+		if err != nil {
+			log.Error(err, "Failed to deny bucket key permission", "BucketName", bucket.Name, "BucketID", bucketInfo.Id, "AccessKeyID", req.AccessKeyId)
+			r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when updating bucket permissions in Garage S3", bucket)
+			return ctrl.Result{}, err
+		}
+	}
+
+	return ctrl.Result{}, err
 }
