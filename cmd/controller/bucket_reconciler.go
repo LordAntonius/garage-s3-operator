@@ -353,6 +353,54 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	garageClient.BucketAPI.UpdateBucket(apiCtx).Id(bucketInfo.Id).UpdateBucketRequestBody(updateBucketReq).Execute()
 
+	// Update Bucket aliases
+	aliases := bucket.Spec.AdditionalAliases
+	aliases = append(aliases, bucket.Name) // Ensure main alias is present
+	for _, alias := range bucketInfo.GlobalAliases {
+		// Remove aliases that are not in the spec
+		found := false
+		for _, desiredAlias := range aliases {
+			if alias == desiredAlias {
+				found = true
+				break
+			}
+		}
+		if !found {
+			aliasReq := garage.RemoveBucketAliasRequest{
+				GlobalAlias: alias,
+				BucketId:    bucketInfo.Id,
+			}
+			_, _, err := garageClient.BucketAliasAPI.RemoveBucketAlias(apiCtx).RemoveBucketAliasRequest(aliasReq).Execute()
+			if err != nil {
+				log.Error(err, "Failed to remove bucket global alias in Garage S3", "BucketName", bucket.Name, "BucketID", bucketInfo.Id, "Alias", alias)
+				r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when removing bucket alias in Garage S3", bucket)
+				return ctrl.Result{}, err
+			}
+		}
+	}
+	for _, desiredAlias := range aliases {
+		// Add aliases that are in the spec but not in Garage S3
+		found := false
+		for _, alias := range bucketInfo.GlobalAliases {
+			if alias == desiredAlias {
+				found = true
+				break
+			}
+		}
+		if !found {
+			aliasReq := garage.AddBucketAliasRequest{
+				GlobalAlias: desiredAlias,
+				BucketId:    bucketInfo.Id,
+			}
+			_, _, err := garageClient.BucketAliasAPI.AddBucketAlias(apiCtx).AddBucketAliasRequest(aliasReq).Execute()
+			if err != nil {
+				log.Error(err, "Failed to add bucket global alias in Garage S3", "BucketName", bucket.Name, "BucketID", bucketInfo.Id, "Alias", desiredAlias)
+				r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when adding bucket alias in Garage S3", bucket)
+				return ctrl.Result{}, err
+			}
+		}
+	}
+
 	// Handle permissions
 	allowReq, denyReq, err := r.GetBucketPermissionChangeRequests(bucket, bucketInfo)
 	// In case of error, some AccessKeys were not found, but we can still process the others
