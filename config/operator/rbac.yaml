@@ -55,7 +55,6 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: garage-s3-operator
-    namespace: garage
 roleRef:
   kind: ClusterRole
   name: garage-s3-operator-clusterrole

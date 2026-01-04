@@ -15,21 +15,16 @@ spec:
       labels:
         app: garage-s3-operator
     spec:
-      serviceAccountName: garage-s3-operator  # RBAC skipped as requested
+      serviceAccountName: garage-s3-operator
       containers:
         - name: garage-s3-operator
-          image: ghcr.io/lordantonius/garage-s3-operator:latest
+          image: $(IMAGE)
           imagePullPolicy: Always
           ports:
             - name: webhook
               containerPort: 9443
             - name: health
               containerPort: 8081
-          env:
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
           readinessProbe:
             httpGet:
               path: /healthz

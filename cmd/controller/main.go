@@ -61,7 +61,13 @@ func main() {
 	}
 
 	// Set logger
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	// Choose dev mode based on DEBUG variable
+	debug := os.Getenv("DEBUG")
+	useDevMode := false
+	if debug == "true" || debug == "1" {
+		useDevMode = true
+	}
+	ctrl.SetLogger(zap.New(zap.UseDevMode(useDevMode)))
 	setupLog := ctrl.Log.WithName("Setup")
 
 	// Start controller manager

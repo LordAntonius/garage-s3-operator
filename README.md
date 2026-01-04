@@ -1,6 +1,9 @@
 # Garage S3 Operator
 
-Garage is a Kubernetes operator that makes it easy to provision and manage Garage S3 storage resources for applications running on your cluster. The project (Garage) aims to provide a simple CR-driven model to create S3 buckets, manage access credentials, lifecycle policies, and integrate with on-prem or cloud S3-compatible backends.
+[![Image](https://img.shields.io/badge/image-ghcr.io%2Flordantonius%2Fgarage--s3--operator-blue)](https://ghcr.io/lordantonius/garage-s3-operator)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
+Garage is a Kubernetes operator that makes it easy to provision and manage Garage S3 storage resources for applications running on your cluster. The project (Garage) aims to provide a simple CR-driven model to create S3 buckets and manage access credentials.
 
 More info: https://garagehq.deuxfleurs.fr
 
@@ -9,109 +12,135 @@ More info: https://garagehq.deuxfleurs.fr
 - **CR-driven provisioning**: Define storage resources using Kubernetes Custom Resources.
 - **Credential management**: Automatic creation and rotation of S3 credentials (secrets) scoped to resources.
 - **Bucket lifecycle**: Express common lifecycle rules (retention, expiration) via CR fields.
-- **Kubernetes-native**: Integrates with RBAC, Secrets, and standard k8s tooling.
+- **Kubernetes-native**: Integrates with Secrets, and standard k8s tooling.
 
 ## Intent & Scope
 
 This operator is intended to be a cluster-native operator that: provision S3 buckets on S3-compatible endpoints, manage credentials as Kubernetes Secrets, and expose an easy-to-use API for developers and platform operators. This repository hosts the operator source and related manifests.
 
-This project is currently in active development — consider this README a living document.
+## Installation
 
-## Prerequisites
+### Prerequisites
 
 - A Kubernetes cluster (v1.20+ recommended).
 - `kubectl` configured to access the cluster.
-- An S3-compatible endpoint and credentials (unless you're running a local backend like MinIO).
-- (Optional) `helm` or `operator-sdk` if you plan to build and deploy from source.
 
-## Quickstart (example)
-
-1. Install the CRDs and operator manifests (example):
-
+### Kustomize
+Install the CRDs and operator manifests via:
 ```bash
-# Apply CRDs and controller manifest (replace with packaged YAML or helm chart when available)
-kubectl apply -f config/crd/bases/
-kubectl apply -f config/manager/manager.yaml
+kubectl apply -k ./config/default
 ```
 
-2. Create a sample S3 resource (example custom resource):
+The default used tag is 1.0.0.
+It can be changed using overlays.
+
+## Quickstart
+
+1. Create Garage S3 instance corresponding to your S3 installation:
 
 ```yaml
-apiVersion: garage.deuxfleurs.fr/v1alpha1
-kind: S3Bucket
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Instance
 metadata:
-	name: demo-bucket
+  name: garage-instance
+  namespace: garage
 spec:
-	backend:
-		endpoint: "https://minio.example.local"
-		region: "us-east-1"
-	bucketName: demo-bucket
-	versioning: true
-	lifecycle:
-		- id: expire-logs
-			prefix: logs/
-			expirationDays: 30
-	credentials:
-		createSecret: true
-		secretName: demo-bucket-credentials
+  # Accessible URL of the Garage S3 instance (optional, default: 127.0.0.1)
+  url: "garage.garage.svc.cluster.local"
+  # Admin API port (optional, default: 3903)
+  port: 3903
+  # Name of the Secret containing the admin token (required field)
+  adminTokenSecret: garage-admin-token
 ```
 
-Apply the resource:
-
-```bash
-kubectl apply -f examples/s3bucket-sample.yaml
+Kubernetes `adminTokenSecret` must have the following structure:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-admin-token
+  namespace: garage
+type: Opaque
+stringData:
+  # Replace the value below with the real admin token.
+  token: <YOUR-REAL-ADMIN-TOKEN>
 ```
 
-3. Inspect created objects:
+2. Create S3 buckets:
 
-```bash
-kubectl get s3buckets
-kubectl get secrets demo-bucket-credentials -o yaml
+```yaml
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3Bucket
+metadata:
+  name: my-bucket
+  namespace: default
+spec:
+  # Name of the GarageS3Instance this Access Key refers to (required field)
+  instanceRef:
+    name: garage-instance
+    namespace: garage
+  permissions:
+  - accessKeyName: alice
+    owner: true
+    read: true
+    write: true
+  # quota:
+  #   maxBytes: 10000 # in bytes
+  #   maxObjects: 10
+  # websiteAccess:
+  #   enabled: true
+  #   indexDocument: index.html
+  #   errorDocument: 404.html
+  # additionalAliases:
+  #  - alice-bucket.garage.com
 ```
 
-Note: The CRD `S3Bucket` and field names above are an example schema to illustrate usage. Check the actual CRD definitions in `config/crd/` for the exact API and field names once the operator is generated or installed from a released bundle.
-
-## Installation Options
-
-- Install from a release (TBD): When releases are published we will provide a `kubectl apply -f` bundle and a Helm chart.
-- Install from source:
-
-```bash
-# build the operator binary or container image
-# (example flow; project may use Go + controller-runtime / operator-sdk)
-make build
-make docker-build IMAGE=registry.example.com/garage-s3-operator:dev
-make deploy IMG=registry.example.com/garage-s3-operator:dev
+3. Create AccessKeys:
+```yaml
+apiVersion: garage-s3-operator.abucquet.com/v1
+kind: GarageS3AccessKey
+metadata:
+  name: alice
+  namespace: default
+spec:
+  # Name of the GarageS3Instance this Access Key refers to (required field)
+  instanceRef:
+    name: garage-instance
+    namespace: garage
+  # canCreateBucket: true
+  # # Expiration in RFC3339 format. Example: 2026-01-30T12:00:00Z
+  #expiration: "2035-01-30T12:00:00Z"
+  # # Set to false to use the expiration above. If true, the key never expires.
+  #neverExpires: false
 ```
-
-Replace the commands above with the repository's specific build and deploy steps once the project contains the build tooling.
 
 ## Development
 
-- Project layout will follow common operator patterns (e.g. `config/`, `api/`, `controllers/`).
-- Recommended stack: Go + controller-runtime (operator-sdk), plus unit & integration tests.
-- Run unit tests:
+Project layout follows common operator patterns (e.g. `config/`, `api/`, `controllers/`).
 
-```bash
-go test ./...
-```
+This repository includes a `Makefile` that provides convenient targets for building, running and testing locally as well as helpers to create a local `kind` cluster and deploy a test environment.
 
-- Local development tips:
-	- Use `kind` or `k3d` for a quick local cluster.
-	- Use `kubectl port-forward` and logs to debug the controller: `kubectl logs -l control-plane=controller-manager -n system` (adjust selector for actual deployment).
+Common targets (run from repository root):
 
-## CRD Examples & Best Practices
+- `make build` — build a container image tagged `ghcr.io/lordantonius/garage-s3-operator:latest` (uses `podman` by default).
+- `make push` — push the `latest` image to the registry.
+- `make push-commit` — build then tag and push an image using the `VERSION` variable (e.g. `1.0.0`) set in the Makefile.
+- `make run` — run the controller locally with `go run ./cmd/controller/*.go` (useful for local debugging against a cluster referenced by your kubeconfig).
+- `make fmt` — run `gofmt -w .` to format the code.
 
-- Keep resource names predictable and include environment/context when needed (e.g., `teamA-backup-bucket`).
-- Store credentials in Kubernetes `Secrets` and limit RBAC to the least privilege required.
-- Use lifecycle settings to control retention and reduce storage costs.
+Kind & test environment helpers:
 
-## Roadmap / Next Steps
+- `make start-podman-kind` — create a `kind` cluster using the Podman provider (uses optional `KIND_CONFIG`).
+- `make stop-podman-kind` — delete the `kind` cluster created above.
+- `make deploy-garage` — start `kind` (via `start-podman-kind`) and deploy the Garage test components required by the integration environment.
+- `make deploy-test-env` — deploy the Garage test environment and apply the `config/overlays/test` kustomize overlay.
+- `make deploy` — apply `config/default` via `kubectl apply -k ./config/default`.
+- `make clean` — stop the kind cluster (alias to `stop-podman-kind`).
 
-- Define and publish stable CRD schema and examples.
-- Provide a Helm chart and release bundles for easy installation.
-- Add automated tests and CI for builds and integration tests.
-- Implement credential rotation, multi-backend connectors, and metrics.
+Local development tips:
+
+- Use `kind` or `k3d` for a quick local cluster.
+- Use `kubectl logs -l app=garage-s3-operator -n garage-s3-operator` (adjust namespace if you changed it)
 
 ## Support & Contact
 
@@ -120,12 +149,3 @@ For questions, feature requests, or support, open an issue in this repository.
 ## License
 
 This repository will use an open-source license. If no `LICENSE` file is present, please consult the repository owner or maintainer to add the appropriate license (e.g., MIT, Apache-2.0).
-
----
-
-If you'd like, I can also:
-- generate example CRD YAMLs under `config/crd/` and an example `examples/` resource,
-- scaffold a basic Go operator layout using the controller-runtime/`operator-sdk`, or
-- add a Helm chart and CI workflow for releases.
-
-Tell me which next step you want and I'll proceed.
