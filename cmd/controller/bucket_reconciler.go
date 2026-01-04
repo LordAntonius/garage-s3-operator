@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -27,6 +28,8 @@ type bucket_reconciler struct {
 	scheme     *runtime.Scheme
 	kubeClient *kubernetes.Clientset
 }
+
+const bucketFinalizer = "garage.abucquet.com/bucket-finalizer"
 
 // Returns the bucket ID if the bucket exists, or empty string if not found
 func (r *bucket_reconciler) BucketExists(apiCtx context.Context, garageClient *garage.APIClient, bucketName string) (string, error) {
@@ -287,6 +290,52 @@ func (r *bucket_reconciler) UpdateStatus(ctx context.Context, status metav1.Cond
 	}
 }
 
+func (r *bucket_reconciler) BucketCleanup(ctx context.Context, bucket *v1.GarageS3Bucket) error {
+
+	// Being deleted: perform finalization then remove finalizer
+	if controllerutil.ContainsFinalizer(bucket, bucketFinalizer) {
+		// Try to delete the bucket on Garage S3
+		instanceRef := bucket.Spec.InstanceRef
+		instance := &v1.GarageS3Instance{}
+		if err := r.Get(ctx, client.ObjectKey{
+			Name:      instanceRef.Name,
+			Namespace: instanceRef.Namespace,
+		}, instance); err != nil {
+			// If associated instance can't be found, log and continue to remove finalizer
+			return fmt.Errorf("failed to get associated GarageS3Instance while finalizing; will remove finalizer to avoid blocking deletion: %w", err)
+		} else {
+			garageClient, apiCtx, err := CreateGarageClient(r.kubeClient, instance)
+			if err != nil {
+				return fmt.Errorf("failed to create Garage S3 client while finalizing; requeueing: %w", err)
+			}
+			// Check bucket presence and delete if exists
+			bucketID, err := r.BucketExists(apiCtx, garageClient, bucket.Name)
+			if err != nil {
+				return fmt.Errorf("failed to check bucket existence while finalizing; requeueing: %w", err)
+			}
+			if bucketID != "" {
+				resp, err := garageClient.BucketAPI.DeleteBucket(apiCtx).Id(bucketID).Execute()
+				if err != nil {
+					switch resp.StatusCode {
+					case 400:
+						return fmt.Errorf("failed to delete bucket in Garage S3 during finalization; requeueing: %w", err)
+					case 404:
+						// Ignore bucket not found
+					default:
+						return fmt.Errorf("failed to delete bucket in Garage S3 during finalization; requeueing: %w", err)
+					}
+				}
+			}
+		}
+		// Remove finalizer so Kubernetes can delete the object
+		controllerutil.RemoveFinalizer(bucket, bucketFinalizer)
+		if err := r.Update(ctx, bucket); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx).WithValues("GarageS3Bucket", req.NamespacedName)
 
@@ -296,8 +345,27 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// TODO: implement finalizer logic here
-	log.Info("TODO: implement GarageS3Bucket finalizer logic")
+	// Finalizer handling: add when not deleting, run cleanup when deleting
+	if bucket.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Not being deleted: ensure finalizer present
+		if !controllerutil.ContainsFinalizer(bucket, bucketFinalizer) {
+			controllerutil.AddFinalizer(bucket, bucketFinalizer)
+			if err := r.Update(ctx, bucket); err != nil {
+				log.Error(err, "Failed to add finalizer to GarageS3Bucket")
+				r.UpdateStatus(ctx, metav1.ConditionFalse, "KubernetesError", "Failed to add finalizer", bucket)
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// Being deleted: perform finalization then remove finalizer
+		if err := r.BucketCleanup(ctx, bucket); err != nil {
+			log.Error(err, "Failed to finalize GarageS3Bucket")
+			r.UpdateStatus(ctx, metav1.ConditionFalse, "FinalizationError", "Failed to finalize bucket", bucket)
+			return ctrl.Result{}, err
+		}
+		log.Info("Deleted bucket", "BucketName", bucket.Name)
+		return ctrl.Result{}, nil
+	}
 
 	// Create client to Garage S3 instance
 	// Fetch the associated GarageS3Instance and create Garage Client

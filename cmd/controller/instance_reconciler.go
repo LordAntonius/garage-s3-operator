@@ -74,9 +74,18 @@ func (r *instance_reconciler) HasChildren(ctx context.Context, instance *v1.Gara
 	if err := r.List(ctx, accessKeyList); err != nil {
 		return true, err
 	}
-
 	for _, key := range accessKeyList.Items {
 		if key.Spec.InstanceRef.Name == instance.Name && key.Spec.InstanceRef.Namespace == instance.Namespace {
+			return true, nil
+		}
+	}
+
+	bucketList := &v1.GarageS3BucketList{}
+	if err := r.List(ctx, bucketList); err != nil {
+		return true, err
+	}
+	for _, bucket := range bucketList.Items {
+		if bucket.Spec.InstanceRef.Name == instance.Name && bucket.Spec.InstanceRef.Namespace == instance.Namespace {
 			return true, nil
 		}
 	}
@@ -128,6 +137,7 @@ func (r *instance_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			log.Error(err, "Failed to remove finalizer from Garage S3 instance")
 			return ctrl.Result{}, err
 		}
+		log.Info("Deleted Garage S3 instance")
 		return ctrl.Result{}, nil
 	}
 
