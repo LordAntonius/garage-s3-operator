@@ -28,8 +28,14 @@ metadata:
   name: garage-s3-operator-clusterrole
 rules:
   - apiGroups: ["garage-s3-operator.abucquet.com"]
-    resources: ["*"]
-    verbs: ["*"]
+    resources:
+      - garages3instances
+      - garages3instances/status
+      - garages3buckets
+      - garages3buckets/status
+      - garages3accesskeys
+      - garages3accesskeys/status
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
