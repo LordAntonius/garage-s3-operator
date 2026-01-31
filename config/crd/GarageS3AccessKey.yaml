@@ -70,6 +70,8 @@ spec:
                   type: boolean
                   description: Whether this Access Key never expires
                   default: true
+              required:
+                - instanceRef
             status:
               description: Observed status of the AccessKey
               type: object
