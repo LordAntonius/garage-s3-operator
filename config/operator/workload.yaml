@@ -18,7 +18,7 @@ spec:
       serviceAccountName: garage-s3-operator
       containers:
         - name: garage-s3-operator
-          image: $(IMAGE)
+          image: controller
           imagePullPolicy: Always
           ports:
             - name: webhook
