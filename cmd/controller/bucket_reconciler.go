@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	v1 "abucquet.com/garage-s3-operator/api/v1"
 	garage "git.deuxfleurs.fr/garage-sdk/garage-admin-sdk-golang"
@@ -30,6 +31,11 @@ type bucket_reconciler struct {
 }
 
 const bucketFinalizer = "garage.abucquet.com/bucket-finalizer"
+
+const (
+	bucketRequeueInterval      = 5 * time.Minute
+	bucketErrorRequeueInterval = 30 * time.Second
+)
 
 // Returns the bucket ID if the bucket exists, or empty string if not found
 func (r *bucket_reconciler) BucketExists(apiCtx context.Context, garageClient *garage.APIClient, bucketName string) (string, error) {
@@ -377,13 +383,13 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}, instance); err != nil {
 		log.Error(err, "Failed to get associated GarageS3Instance", "InstanceRef", instanceRef)
 		r.UpdateStatus(ctx, metav1.ConditionFalse, "InstanceNotFound", "Associated GarageS3Instance not found", bucket)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 	}
 	garageClient, apiCtx, err := CreateGarageClient(r.kubeClient, instance)
 	if err != nil {
 		log.Error(err, "Failed to create Garage S3 client for associated instance", "InstanceRef", instanceRef)
 		r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageClientError", "Could not create Garage S3 client", bucket)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 	}
 
 	// Check if bucket exists in Garage S3
@@ -391,7 +397,7 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if err != nil {
 		log.Error(err, "Failed to check if bucket exists in Garage S3", "BucketName", bucket.Name)
 		r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when calling Garage S3 API", bucket)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 	}
 
 	// Create bucket if not exists
@@ -401,7 +407,7 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			log.Error(err, "Failed to create bucket in Garage S3", "BucketName", bucket.Name)
 			r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when creating bucket in Garage S3", bucket)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 		}
 		log.Info("Created bucket in Garage S3", "BucketName", bucket.Name, "BucketID", bucketInfo.Id)
 	} else {
@@ -410,7 +416,7 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			log.Error(err, "Failed to get bucket info from Garage S3", "BucketName", bucket.Name, "BucketID", bucketID)
 			r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when retrieving bucket info from Garage S3", bucket)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 		}
 	}
 
@@ -442,7 +448,7 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err != nil {
 				log.Error(err, "Failed to remove bucket global alias in Garage S3", "BucketName", bucket.Name, "BucketID", bucketInfo.Id, "Alias", alias)
 				r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when removing bucket alias in Garage S3", bucket)
-				return ctrl.Result{}, err
+				return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 			}
 		}
 	}
@@ -464,7 +470,7 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err != nil {
 				log.Error(err, "Failed to add bucket global alias in Garage S3", "BucketName", bucket.Name, "BucketID", bucketInfo.Id, "Alias", desiredAlias)
 				r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when adding bucket alias in Garage S3", bucket)
-				return ctrl.Result{}, err
+				return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 			}
 		}
 	}
@@ -478,7 +484,7 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			log.Error(err, "Failed to allow bucket key permission", "BucketName", bucket.Name, "BucketID", bucketInfo.Id, "AccessKeyID", req.AccessKeyId)
 			r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when updating bucket permissions in Garage S3", bucket)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 		}
 	}
 	for _, req := range denyReq {
@@ -486,9 +492,16 @@ func (r *bucket_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			log.Error(err, "Failed to deny bucket key permission", "BucketName", bucket.Name, "BucketID", bucketInfo.Id, "AccessKeyID", req.AccessKeyId)
 			r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageAPIError", "Error when updating bucket permissions in Garage S3", bucket)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
 		}
 	}
 
-	return ctrl.Result{}, err
+	if err != nil {
+		log.Error(err, "One or more access keys not found for bucket permissions, will retry", "BucketName", bucket.Name)
+		r.UpdateStatus(ctx, metav1.ConditionFalse, "PermissionsIncomplete", "One or more access keys not found for bucket permissions", bucket)
+		return ctrl.Result{RequeueAfter: bucketErrorRequeueInterval}, err
+	}
+
+	r.UpdateStatus(ctx, metav1.ConditionTrue, "Ready", "Bucket is ready", bucket)
+	return ctrl.Result{RequeueAfter: bucketRequeueInterval}, nil
 }

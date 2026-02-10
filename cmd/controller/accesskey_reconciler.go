@@ -16,6 +16,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
+const (
+	accessKeyRequeueInterval      = 5 * time.Minute
+	accessKeyErrorRequeueInterval = 30 * time.Second
+)
+
 // accessKeyReconciler is a reconciler for GarageS3AccessKey resources.
 type accessKeyReconciler struct {
 	client.Client
@@ -186,13 +191,13 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	}, instance); err != nil {
 		log.Error(err, "Failed to get associated GarageS3Instance", "InstanceRef", instanceRef)
 		r.UpdateStatus(ctx, "", metav1.ConditionFalse, "InstanceNotFound", "Associated GarageS3Instance not found", ak)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 	}
 	garageClient, apiCtx, err := CreateGarageClient(r.kubeClient, instance)
 	if err != nil {
 		log.Error(err, "Failed to create Garage S3 client for associated instance", "InstanceRef", instanceRef)
 		r.UpdateStatus(ctx, "", metav1.ConditionFalse, "GarageClientError", "Could not create Garage S3 client", ak)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 	}
 
 	// Check if Access Key already exists in Garage S3
@@ -201,7 +206,7 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		log.Error(err, "Failed to check if Access Key exists", "KeyName", keyName)
 		r.UpdateStatus(ctx, "", metav1.ConditionUnknown, "UnknownGarageState", "Failed to check if Access Key exists", ak)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 	}
 	if accessKey == "" {
 		// Create Access Key in Garage S3
@@ -209,13 +214,13 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if err != nil {
 			log.Error(err, "Failed to generate Access Key creation body", "KeyName", keyName)
 			r.UpdateStatus(ctx, "", metav1.ConditionFalse, "SyntaxError", "Error in json spec", ak)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, err // spec error, no point retrying until spec changes
 		}
 		keyInfo, _, err := garageClient.AccessKeyAPI.CreateKey(apiCtx).Body(req).Execute()
 		if err != nil {
 			log.Error(err, "Failed to create Access Key in Garage S3", "KeyName", keyName)
 			r.UpdateStatus(ctx, "", metav1.ConditionFalse, "GarageClientError", "Failed to create Access Key in Garage S3", ak)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 		}
 
 		accessKey = keyInfo.AccessKeyId
@@ -228,7 +233,7 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if err != nil {
 			log.Error(err, "Failed to generate Access Key update body", "KeyName", keyName)
 			r.UpdateStatus(ctx, "", metav1.ConditionFalse, "SyntaxError", "Error in json spec", ak)
-			return ctrl.Result{}, err
+			return ctrl.Result{}, err // spec error, no point retrying until spec changes
 		}
 		req := garage.UpdateKeyRequestBody{
 			Name:         cReq.Name,
@@ -241,7 +246,7 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if err != nil {
 			log.Error(err, "Failed to update Access Key in Garage S3", "KeyName", keyName)
 			r.UpdateStatus(ctx, "", metav1.ConditionFalse, "GarageClientError", "Failed to update Access Key in Garage S3", ak)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 		}
 
 		accessKey = keyInfo.AccessKeyId
@@ -251,7 +256,7 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			if err != nil {
 				log.Error(err, "Failed to retrieve Secret Key for Access Key", "KeyName", keyName)
 				r.UpdateStatus(ctx, "", metav1.ConditionFalse, "GarageClientError", "Failed to retrieve Secret Key for Access Key", ak)
-				return ctrl.Result{}, err
+				return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 			}
 			secretKey = res.GetSecretAccessKey()
 		}
@@ -283,14 +288,14 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if err := controllerutil.SetControllerReference(ak, sec, r.scheme); err != nil {
 			log.Error(err, "Failed to set owner reference on Secret", "SecretName", secretName)
 			r.UpdateStatus(ctx, "", metav1.ConditionFalse, "OwnerReferenceError", "Failed to set owner reference on Secret", ak)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 		}
 
 		_, err := r.kubeClient.CoreV1().Secrets(ak.Namespace).Create(ctx, sec, metav1.CreateOptions{})
 		if err != nil {
 			log.Error(err, "Failed to create Kubernetes Secret for Access Key", "SecretName", secretName)
 			r.UpdateStatus(ctx, "", metav1.ConditionFalse, "KubernetesError", "Failed to create Kubernetes Secret for Access Key", ak)
-			return ctrl.Result{}, err
+			return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 		}
 		log.Info("Created Kubernetes Secret for Access Key", "SecretName", secretName)
 	} else {
@@ -318,14 +323,14 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			if err != nil {
 				log.Error(err, "Failed to update Kubernetes Secret for Access Key", "SecretName", secretName)
 				r.UpdateStatus(ctx, "", metav1.ConditionFalse, "KubernetesError", "Failed to update Kubernetes Secret for Access Key", ak)
-				return ctrl.Result{}, err
+				return ctrl.Result{RequeueAfter: accessKeyErrorRequeueInterval}, err
 			}
 			log.Info("Updated Kubernetes Secret for Access Key", "SecretName", secretName)
 		}
 	}
 
 	r.UpdateStatus(ctx, secretName, metav1.ConditionTrue, "Ready", "Access Key is ready", ak)
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: accessKeyRequeueInterval}, nil
 }
 
 // SetupWithManager registers the reconciler with the controller manager.
