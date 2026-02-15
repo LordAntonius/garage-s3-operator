@@ -38,6 +38,8 @@ jobs:
       - name: Build manifests
         run: |
           cd config/default
+          ref="ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.tag }}"
+          lowercase_ref=$(echo "$ref" | tr '[:upper:]' '[:lower:]')
           kustomize edit set image "controller=ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.tag }}"
           cd ../..
           kustomize build ./config/default > /tmp/install.yaml
