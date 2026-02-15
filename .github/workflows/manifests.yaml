@@ -44,8 +44,10 @@ jobs:
 
       - name: Push manifests
         run: |
+          ref="oci://ghcr.io/${{ github.repository }}-manifests:${{ steps.tag.outputs.tag }}"
+          lowercase_ref=$(echo "$ref" | tr '[:upper:]' '[:lower:]')
           flux push artifact \
-            oci://ghcr.io/${{ github.repository }}-manifests:${{ steps.tag.outputs.tag }} \
+            $lowercase_ref \
             --path=/tmp/install.yaml \
             --source="${{ github.server_url }}/${{ github.repository }}" \
             --revision="${{ github.ref_name }}@sha1:${{ github.sha }}"
