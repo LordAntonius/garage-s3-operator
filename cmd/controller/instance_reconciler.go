@@ -21,6 +21,11 @@ type instance_reconciler struct {
 
 const instanceFinalizer = "garage.abucquet.com/finalizer"
 
+const (
+	instanceRequeueInterval      = 5 * time.Minute
+	instanceErrorRequeueInterval = 30 * time.Second
+)
+
 func (r *instance_reconciler) UpdateStatus(ctx context.Context, status metav1.ConditionStatus, reason string, message string, instance *v1.GarageS3Instance) {
 	cond := metav1.Condition{
 		Type:    "Ready",
@@ -146,7 +151,7 @@ func (r *instance_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		log.Error(err, "Failed to create Garage S3 client")
 		r.UpdateStatus(ctx, metav1.ConditionFalse, "GarageClientError", "Failed to create Garage S3 client", instance)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: instanceErrorRequeueInterval}, err
 	}
 
 	// Test connection to Garage S3 instance and get status
@@ -154,12 +159,12 @@ func (r *instance_reconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	if err != nil {
 		log.Error(err, "Failed to connect to Garage S3 instance")
 		r.UpdateStatus(ctx, metav1.ConditionFalse, "ConnectionError", "Failed to connect to Garage S3 instance", instance)
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: instanceErrorRequeueInterval}, err
 	}
 	log.Info("Connected to Garage S3 instance", "status", health.Status)
 
 	// Update instance status with Connected condition
 	r.UpdateStatus(ctx, metav1.ConditionTrue, "Connected", "Successfully connected to Garage S3 instance", instance)
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: instanceRequeueInterval}, nil
 }
