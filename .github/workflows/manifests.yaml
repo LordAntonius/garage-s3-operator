@@ -1,0 +1,51 @@
+name: Publish manifests
+
+on:
+  push:
+    branches: [main]
+    tags: [v*]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@8454b02a32e48d775b9f563cb51fdcb1787b5b93 # v2.7.5
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build manifests
+        run: |
+          cd config/default
+          kustomize edit set image "controller=ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.tag }}"
+          cd ../..
+          kustomize build ./config/default > /tmp/install.yaml
+
+      - name: Push manifests
+        run: |
+          flux push artifact \
+            oci://ghcr.io/${{ github.repository }}-manifests:${{ steps.tag.outputs.tag }} \
+            --path=/tmp/install.yaml \
+            --source="${{ github.server_url }}/${{ github.repository }}" \
+            --revision="${{ github.ref_name }}@sha1:${{ github.sha }}"
