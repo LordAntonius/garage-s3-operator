@@ -35,17 +35,23 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Lowercase repository name
+        id: lowercase
+        run: |
+          lowercase_repo=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo=${lowercase_repo}" >> "$GITHUB_OUTPUT"
+
       - name: Build manifests
         run: |
           cd config/default
-          kustomize edit set image "controller=ghcr.io/${{ github.repository }}:${{ steps.tag.outputs.tag }}"
+          kustomize edit set image "controller=ghcr.io/${{ steps.lowercase.outputs.repo }}:${{ steps.tag.outputs.tag }}"
           cd ../..
           kustomize build ./config/default > /tmp/install.yaml
 
       - name: Push manifests
         run: |
           flux push artifact \
-            oci://ghcr.io/${{ github.repository }}-manifests:${{ steps.tag.outputs.tag }} \
+            oci://ghcr.io/${{ steps.lowercase.outputs.repo }}-manifests:${{ steps.tag.outputs.tag }} \
             --path=/tmp/install.yaml \
-            --source="${{ github.server_url }}/${{ github.repository }}" \
+            --source="${{ github.server_url }}/${{ steps.lowercase.outputs.repo }}" \
             --revision="${{ github.ref_name }}@sha1:${{ github.sha }}"
