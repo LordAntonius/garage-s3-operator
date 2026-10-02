@@ -115,6 +115,33 @@ func (r *accessKeyReconciler) UpdateStatus(ctx context.Context, secretName strin
 	}
 }
 
+// syncAccessKeySecretData writes the access key pair into the Secret under every managed key name
+// and reports whether any value changed.
+//
+// AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are the names that AWS SDKs and most S3 clients read
+// from the environment, so a workload can load the Secret with envFrom. AWS_ACCESS_KEY and
+// AWS_SECRET_KEY are the original names and remain for existing consumers.
+func syncAccessKeySecretData(secret *corev1.Secret, accessKey string, secretKey string) bool {
+	values := map[string]string{
+		"AWS_ACCESS_KEY_ID":     accessKey,
+		"AWS_SECRET_ACCESS_KEY": secretKey,
+		"AWS_ACCESS_KEY":        accessKey,
+		"AWS_SECRET_KEY":        secretKey,
+	}
+	if secret.Data == nil {
+		secret.Data = map[string][]byte{}
+	}
+	changed := false
+	for key, value := range values {
+		if string(secret.Data[key]) == value {
+			continue
+		}
+		secret.Data[key] = []byte(value)
+		changed = true
+	}
+	return changed
+}
+
 // Reconcile performs reconciliation for GarageS3AccessKey.
 func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx).WithValues("GarageS3AccessKey", req.NamespacedName)
@@ -269,11 +296,6 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	secret, err := r.kubeClient.CoreV1().Secrets(ak.Namespace).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		// Create Kubernetes Secret with Access Key and Secret Key
-		secretData := map[string][]byte{
-			"AWS_ACCESS_KEY": []byte(accessKey),
-			"AWS_SECRET_KEY": []byte(secretKey),
-		}
-
 		sec := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      secretName,
@@ -282,8 +304,8 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 					"managed-by": "garage-s3-operator",
 				},
 			},
-			Data: secretData,
 		}
+		syncAccessKeySecretData(sec, accessKey, secretKey)
 		// set owner reference so Secret is garbage-collected with the GarageS3AccessKey
 		if err := controllerutil.SetControllerReference(ak, sec, r.scheme); err != nil {
 			log.Error(err, "Failed to set owner reference on Secret", "SecretName", secretName)
@@ -310,12 +332,7 @@ func (r *accessKeyReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			updated = true
 		}
 
-		if string(secret.Data["AWS_ACCESS_KEY"]) != accessKey {
-			secret.Data["AWS_ACCESS_KEY"] = []byte(accessKey)
-			updated = true
-		}
-		if string(secret.Data["AWS_SECRET_KEY"]) != secretKey {
-			secret.Data["AWS_SECRET_KEY"] = []byte(secretKey)
+		if syncAccessKeySecretData(secret, accessKey, secretKey) {
 			updated = true
 		}
 		if updated {

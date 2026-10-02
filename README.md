@@ -114,6 +114,11 @@ spec:
   #neverExpires: false
 ```
 
+The operator stores the key pair in a Secret named `<name>-gs3ak` in the same namespace. The
+Secret has `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, the names AWS SDKs and most S3
+clients read from the environment, so a workload can load it with `envFrom`. It also has
+`AWS_ACCESS_KEY` and `AWS_SECRET_KEY` with the same values for existing consumers.
+
 ## Development
 
 Project layout follows common operator patterns (e.g. `config/`, `api/`, `controllers/`).
